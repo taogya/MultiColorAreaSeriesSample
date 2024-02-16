@@ -1,0 +1,2 @@
+# MultiColorAreaSeriesSample
+OxyPlot AreaSeriesをMultiColorに拡張したサンプル
