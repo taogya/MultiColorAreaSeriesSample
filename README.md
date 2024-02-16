@@ -1,2 +1,2 @@
 # MultiColorAreaSeriesSample
-OxyPlot AreaSeries‚ğMultiColor‚ÉŠg’£‚µ‚½ƒTƒ“ƒvƒ‹
+OxyPlot AreaSeriesã‚’MultiColorã«æ‹¡å¼µã—ãŸã‚µãƒ³ãƒ—ãƒ«
