@@ -11,6 +11,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using OxyPlot;
+using OxyPlot.Axes;
 using OxyPlot.Series;
 
 namespace MultiColorAreaSeriesSample.OxyPlot.Series
@@ -20,6 +21,29 @@ namespace MultiColorAreaSeriesSample.OxyPlot.Series
     /// </summary>
     public class MultiColorAreaSeries : LineSeries
     {
+        public class FillWithLimit
+        {
+            public double LimitLo { get; set; }
+            public double LimitHi { get; set; }
+            public OxyColor Color { get; set; }
+
+            public FillWithLimit() : this(null, null, OxyColors.Automatic) { }
+            public FillWithLimit(FillWithLimit fwl) : this(fwl.LimitLo, fwl.LimitHi, fwl.Color) { }
+            public FillWithLimit(double? LimitLo, double? LimitHi, OxyColor Color)
+            {
+                this.LimitLo = LimitLo ?? double.MinValue;
+                this.LimitHi = LimitHi ?? double.MaxValue;
+                this.Color = Color;
+            }
+            public bool IsInLimitRange(double value) => LimitLo <= value && value < LimitHi;
+        }
+
+        /// <summary>
+        /// The default color.
+        /// </summary>
+        private readonly List<FillWithLimit> defaultFills;
+
+
         /// <summary>
         /// The second list of points.
         /// </summary>
@@ -28,25 +52,38 @@ namespace MultiColorAreaSeriesSample.OxyPlot.Series
         /// <summary>
         /// The secondary data points from the <see cref="P:ItemsSource" /> collection.
         /// </summary>
-        private readonly List<DataPoint> itemsSourcePoints2 = new List<DataPoint>();
+        private readonly List<DataPoint> itemsSourcePoints2 = new();
 
         /// <summary>
         /// The secondary data points from the <see cref="P:Points2" /> list.
         /// </summary>
-        private List<DataPoint> actualPoints2;
+        private List<DataPoint> actualPoints2 = new();
 
         /// <summary>
         /// Initializes a new instance of the <see cref = "MultiColorAreaSeries" /> class.
         /// </summary>
         public MultiColorAreaSeries(int Size)
         {
-            this.Size =Size;
-            this.Reverse2 = true;
+            if (Size < 1)
+            {
+                throw new ArgumentException("Size must be 1 or greater.");
+            }
+            this.Size = Size;
+            this.Reverse2 = false;
             this.Color2 = OxyColors.Automatic;
-            this.Fill = OxyColors.Automatic;
+            this.defaultFills = Enumerable.Repeat(new FillWithLimit(), Size).ToList();
+            this.Fills = this.defaultFills.Select(fill => new FillWithLimit(fill)).ToList();
         }
 
         public int Size { get; private set; }
+
+        public OxyColor AreaStrokeColor { get; set; }
+
+        public OxyColor ActualAreaStrokeColor { get => this.AreaStrokeColor.GetActualColor(OxyColors.Undefined); }
+
+        public double AreaStrokeThickness { get; set; }
+
+        public double ActualAreaStrokeThickness { get => this.AreaStrokeThickness; }
 
         /// <summary>
         /// Gets or sets a constant value for the area definition.
@@ -62,13 +99,13 @@ namespace MultiColorAreaSeriesSample.OxyPlot.Series
         /// Gets or sets the data field to use for the X-coordinates of the second data set.
         /// </summary>
         /// <remarks>This property is used if <see cref="P:ItemsSource" /> is set.</remarks>
-        public string DataFieldX2 { get; set; }
+        public string DataFieldX2 { get; set; } = string.Empty;
 
         /// <summary>
         /// Gets or sets the data field to use for the Y-coordinates of the second data set.
         /// </summary>
         /// <remarks>This property is used if <see cref="P:ItemsSource" /> is set.</remarks>
-        public string DataFieldY2 { get; set; }
+        public string DataFieldY2 { get; set; } = string.Empty;
 
         /// <summary>
         /// Gets or sets the color of the line for the second data set.
@@ -92,17 +129,17 @@ namespace MultiColorAreaSeriesSample.OxyPlot.Series
         /// Gets or sets the fill color of the area.
         /// </summary>
         /// <value>The fill color.</value>
-        public OxyColor Fill { get; set; }
+        public List<FillWithLimit> Fills { get; set; }
 
         /// <summary>
         /// Gets the actual fill color of the area.
         /// </summary>
         /// <value>The actual fill color.</value>
-        public OxyColor ActualFill
+        public List<FillWithLimit> ActualFills
         {
             get
             {
-                return this.Fill.GetActualColor(OxyColor.FromAColor(100, this.ActualColor));
+                return this.Fills.Select((fill, n) => new FillWithLimit(fill.LimitLo, fill.LimitHi, fill.Color.GetActualColor(OxyColor.FromAColor(100, this.defaultFills[n].Color)))).ToList();
             }
         }
 
@@ -156,15 +193,15 @@ namespace MultiColorAreaSeriesSample.OxyPlot.Series
         /// <param name="point">The point.</param>
         /// <param name="interpolate">interpolate if set to <c>true</c> .</param>
         /// <returns>A TrackerHitResult for the current hit.</returns>
-        public override TrackerHitResult GetNearestPoint(ScreenPoint point, bool interpolate)
+        public override TrackerHitResult? GetNearestPoint(ScreenPoint point, bool interpolate)
         {
             var xy = this.InverseTransform(point);
             var targetX = xy.X;
             int startIdx = this.IsXMonotonic
-                ? this.FindWindowStartIndex(this.ActualPoints, p => p.x, targetX, this.WindowStartIndex)
+                ? this.FindWindowStartIndex(this.ActualPoints, p => p.X, targetX, this.WindowStartIndex)
                 : 0;
             int startIdx2 = this.IsXMonotonic
-                ? this.FindWindowStartIndex(this.ActualPoints2, p => p.x, targetX, this.WindowStartIndex2)
+                ? this.FindWindowStartIndex(this.ActualPoints2, p => p.X, targetX, this.WindowStartIndex2)
                 : 0;
 
             TrackerHitResult result1, result2;
@@ -179,7 +216,7 @@ namespace MultiColorAreaSeriesSample.OxyPlot.Series
                 result2 = this.GetNearestPointInternal(this.ActualPoints2, startIdx2, point);
             }
 
-            TrackerHitResult result;
+            TrackerHitResult? result;
             if (result1 != null && result2 != null)
             {
                 double dist1 = result1.Position.DistanceTo(point);
@@ -205,6 +242,19 @@ namespace MultiColorAreaSeriesSample.OxyPlot.Series
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Gets interpolated X coordinate for given Y on a straight line
+        /// between two points.
+        /// </summary>
+        /// <param name="a">First point.</param>
+        /// <param name="b">Second point.</param>
+        /// <param name="y">Y coordinate.</param>
+        /// <returns>Corresponding X coordinate.</returns>
+        private double GetInterpolatedX(DataPoint a, DataPoint b, double y)
+        {
+            return (((y - a.Y) / (b.Y - a.Y)) * (b.X - a.X)) + a.X;
         }
 
         /// <summary>
@@ -245,16 +295,16 @@ namespace MultiColorAreaSeriesSample.OxyPlot.Series
 
             double minDistSquared = this.MinimumSegmentLength * this.MinimumSegmentLength;
 
-            var areaContext = new AreaRenderContext
+            var areaContext = new AreaRenderContext()
             {
                 Points = actualPoints,
                 WindowStartIndex = startIdx,
                 XMax = xmax,
-                RenderContext = rc,
                 MinDistSquared = minDistSquared,
+                RenderContext = rc,
                 Reverse = false,
                 Color = this.ActualColor,
-                DashArray = this.ActualDashArray
+                DashArray = this.ActualDashArray,
             };
 
             var chunksOfPoints = this.RenderChunkedPoints(areaContext);
@@ -277,16 +327,75 @@ namespace MultiColorAreaSeriesSample.OxyPlot.Series
                 var pts = chunksOfPoints[chunkIndex];
                 var pts2 = chunksOfPoints2[chunkIndex];
 
-                // combine the two lines and draw the clipped area
+                if (pts.Count != pts2.Count && pts.Count == 0)
+                {
+                    continue;
+                }
+
+                ScreenPoint lastPoint = pts[0];
+                ScreenPoint lastPoint2 = pts2[0];
+                var dp = this.InverseTransform(lastPoint);
+                var lastFill = this.Fills.Where(fill => fill.IsInLimitRange(dp.Y)).FirstOrDefault();
                 var allPts = new List<ScreenPoint>();
-                allPts.AddRange(pts2);
-                allPts.AddRange(pts);
+                var ptsChunk = new List<ScreenPoint>() { pts[0] };
+                var ptsChunk2 = new List<ScreenPoint>() { pts2[0] };
+                for (var n = 1; n < pts.Count; n++)
+                {
+                    var sp = pts[n];
+                    var sp2 = pts2[n];
+
+                    // Judgement Now Range
+                    dp = InverseTransform(sp);
+                    var fill = this.Fills.Where(fill => fill.IsInLimitRange(dp.Y)).FirstOrDefault();
+                    // Changed Fill Color
+                    if (lastFill != fill && fill != null)
+                    {
+                        var limit = dp.Y < lastFill.LimitLo ? lastFill.LimitLo : lastFill.LimitHi;
+                        var boundarySp = ptsChunk.Last();
+                        var boundarySp2 = ptsChunk2.Last();
+                        if (limit != double.MinValue && limit != double.MaxValue)
+                        {
+                            var lastDp = InverseTransform(boundarySp);
+                            var lastDp2 = InverseTransform(boundarySp2);
+                            var boundaryDp = new DataPoint(this.GetInterpolatedX(lastDp, dp, limit), limit);
+                            boundarySp = this.Transform(boundaryDp.X, boundaryDp.Y);
+                            boundarySp2 = this.Transform(boundaryDp.X, lastDp2.Y);
+                            // combine the two lines and draw the clipped area
+                            ptsChunk.Add(boundarySp);
+                            ptsChunk2.Add(boundarySp2);
+                        }
+                        ptsChunk2.Reverse();
+                        allPts.AddRange(ptsChunk2);
+                        allPts.AddRange(ptsChunk);
+                        rc.DrawReducedPolygon(
+                            allPts,
+                            minDistSquared,
+                            this.GetSelectableFillColor(lastFill?.Color ?? OxyColors.White),
+                            this.ActualAreaStrokeColor,
+                            this.ActualAreaStrokeThickness,
+                            this.EdgeRenderingMode);
+
+                        lastFill = fill;
+                        lastPoint = sp;
+                        lastPoint2 = sp2;
+                        allPts = new List<ScreenPoint>();
+                        ptsChunk = new List<ScreenPoint>() { boundarySp };
+                        ptsChunk2 = new List<ScreenPoint>() { boundarySp2 };
+                    }
+                    // Add Point
+                    ptsChunk.Add(sp);
+                    ptsChunk2.Add(sp2);
+                }
+                // Draw Last Area
+                ptsChunk2.Reverse();
+                allPts.AddRange(ptsChunk2);
+                allPts.AddRange(ptsChunk);
                 rc.DrawReducedPolygon(
                     allPts,
                     minDistSquared,
-                    this.GetSelectableFillColor(this.ActualFill),
-                    OxyColors.Undefined,
-                    0,
+                    this.GetSelectableFillColor(lastFill?.Color ?? OxyColors.White),
+                            this.ActualAreaStrokeColor,
+                            this.ActualAreaStrokeThickness,
                     this.EdgeRenderingMode);
 
                 var markerSizes = new[] { this.MarkerSize };
@@ -338,13 +447,13 @@ namespace MultiColorAreaSeriesSample.OxyPlot.Series
                 rc.DrawLine(pts0, this.GetSelectableColor(this.ActualColor), this.StrokeThickness, this.EdgeRenderingMode, this.ActualLineStyle.GetDashArray());
                 rc.DrawLine(pts1, this.GetSelectableColor(this.ActualColor2), this.StrokeThickness, this.EdgeRenderingMode, this.ActualLineStyle.GetDashArray());
             }
-            rc.DrawPolygon(pts, this.GetSelectableFillColor(this.ActualFill), OxyColors.Undefined, 0, this.EdgeRenderingMode);
+            rc.DrawPolygon(pts, this.GetSelectableFillColor(this.ActualFills[0].Color), OxyColors.Undefined, 0, this.EdgeRenderingMode);
         }
 
         /// <summary>
         /// The update data.
         /// </summary>
-        protected internal override void UpdateData()
+        protected override void UpdateData()
         {
             base.UpdateData();
 
@@ -373,9 +482,9 @@ namespace MultiColorAreaSeriesSample.OxyPlot.Series
             if (this.IsPoints2Defined)
             {
                 var filler = new ListBuilder<DataPoint>();
-                filler.Add(this.DataFieldX2, double.NaN);
-                filler.Add(this.DataFieldY2, double.NaN);
-                filler.Fill(this.itemsSourcePoints2, this.ItemsSource, args => new DataPoint(Axes.Axis.ToDouble(args[0]), Axes.Axis.ToDouble(args[1])));
+                filler.Add(this.DataFieldX2!, double.NaN);
+                filler.Add(this.DataFieldY2!, double.NaN);
+                filler.Fill(this.itemsSourcePoints2, this.ItemsSource, args => new DataPoint(Axis.ToDouble(args[0]), Axis.ToDouble(args[1])));
             }
             else
             {
@@ -386,7 +495,7 @@ namespace MultiColorAreaSeriesSample.OxyPlot.Series
         /// <summary>
         /// Updates the maximum and minimum values of the series.
         /// </summary>
-        protected internal override void UpdateMaxMin()
+        protected override void UpdateMaxMin()
         {
             base.UpdateMaxMin();
             this.InternalUpdateMaxMin(this.ActualPoints2);
@@ -425,7 +534,7 @@ namespace MultiColorAreaSeriesSample.OxyPlot.Series
                 }
 
                 // We break after two points were seen beyond xMax to ensure glitch-free rendering.
-                clipCount += point.x > context.XMax ? 1 : 0;
+                clipCount += point.X > context.XMax ? 1 : 0;
                 if (clipCount > 1)
                 {
                     break;
@@ -480,7 +589,7 @@ namespace MultiColorAreaSeriesSample.OxyPlot.Series
         /// <returns>X coordinate.</returns>
         protected double GetPointX(DataPoint point)
         {
-            return point.x;
+            return point.X;
         }
 
         /// <summary>

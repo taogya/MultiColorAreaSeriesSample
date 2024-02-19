@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using MultiColorAreaSeriesSample.OxyPlot.Series;
 
 namespace MultiColorAreaSeriesSample
 {
@@ -19,22 +20,36 @@ namespace MultiColorAreaSeriesSample
         {
             #region Series
             var startDateTime = new DateTime(2024, 2, 16, 14, 0, 0);
-            var series = new TwoColorAreaSeries()
+            var fills = new List<MultiColorAreaSeries.FillWithLimit>()
             {
-                Color = OxyColor.Parse("#55ff0000"),
-                Color2 = OxyColor.Parse("#550000ff"),
-                Fill = OxyColor.Parse("#5500ff00"),
-                Fill2 = OxyColor.Parse("#5500ffff"),
-                Limit =1.0,
+                    new(null, -0.8, OxyColor.Parse("#77000044")), // y < -0.8 Color
+                    new(-0.8, -0.6, OxyColor.Parse("#77000088")), // -0.8 <= y < -0.6 Color
+                    new(-0.6, -0.4, OxyColor.Parse("#770000cc")), // -0.6 <= y < -0.4 Color
+                    new(-0.4, -0.2, OxyColor.Parse("#770000ff")), // -0.4 <= y < -0.2 Color
+                    new(-0.2, 0.0, OxyColor.Parse("#7700ffff")), // -0.4 <= y < -0.2 Color
+                    new(0.0, 0.2, OxyColor.Parse("#77ffff00")), // 0.0 <= y < 0.2 Color
+                    new(0.2, 0.4, OxyColor.Parse("#77ff0000")), // 0.2 <= y < 0.4 Color
+                    new(0.4, 0.6, OxyColor.Parse("#77cc0000")), // 0.4 <= y < 0.6 Color
+                    new(0.6, 0.8, OxyColor.Parse("#77880000")), // 0.6 <= y < 0.8 Color
+                    new(0.8, null, OxyColor.Parse("#77440000")), // 0.8 <= y Color
+            };
+            var series = new MultiColorAreaSeries(fills.Count)
+            {
+                Color = OxyColor.FromArgb(0xff, 0xff, 0x00, 0x00), // first line color
+                Color2 = OxyColor.FromArgb(0xff, 0x00, 0x00, 0xff), // second line color
+                Fills = fills,
+                AreaStrokeColor = OxyColors.Black,
+                AreaStrokeThickness = 5.0
             };
             var f = 1.0 / 60; // Hz
             var fs = 1.0; // Hz
             var nMax = 60.0 / fs; // 1 min
-            for (var n = 0; n < nMax; n++)
+            for (var n = 0; n <= nMax; n++)
             {
                 var x = DateTimeAxis.ToDouble(startDateTime.AddSeconds(n / fs));
-                var y = Math.Sin(2 * Math.PI * f * n / fs) + 1;
+                var y = Math.Sin(2 * Math.PI * f * n / fs);
                 series.Points.Add(new(x, y));
+                series.Points2.Add(new(x, 0));
             }
             plotModel.Series.Add(series);
             #endregion
