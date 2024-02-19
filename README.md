@@ -1,5 +1,5 @@
 # MultiColorAreaSeriesSample
-OxyPlot AreaSeriesをMultiColorに拡張したサンプル。<br>
+OxyPlot TwoColorAreaSeries を MultiColor に拡張したサンプル。<br>
 yの値が指定した範囲内であるときに，そのエリアを指定した色に染めます。
 
 ## Example
