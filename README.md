@@ -33,4 +33,4 @@ yの値が指定した範囲内であるときに，そのエリアを指定し�
 
 > [!WARNING]  
 > X軸の時間がずれているのは、[サンプルコード](MultiColorAreaSeriesSample/MainWindowViewModel.cs) の60行目の計算がよろしくないみたい。<br>
-> DateTimeAxisでなく、LinearAxis に変更すると期待するポイントから表示されるかと思います。
+> MajorStep / MinorStep をコメントアウトすると、期待するポイントから表示されるかと思います。
